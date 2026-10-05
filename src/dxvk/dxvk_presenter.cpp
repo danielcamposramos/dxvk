@@ -501,6 +501,16 @@ namespace dxvk {
   }
 
 
+  void Presenter::setImageLayers(uint32_t layers) {
+    std::lock_guard lock(m_surfaceMutex);
+
+    if (m_preferredLayers != layers) {
+      m_preferredLayers = layers;
+      m_dirtySwapchain = true;
+    }
+  }
+
+
   void Presenter::setHdrMetadata(VkHdrMetadataEXT hdrMetadata) {
     std::lock_guard lock(m_surfaceMutex);
 
@@ -729,7 +739,8 @@ namespace dxvk {
     swapInfo.imageFormat            = surfaceFormat.format;
     swapInfo.imageColorSpace        = surfaceFormat.colorSpace;
     swapInfo.imageExtent            = imageExtent;
-    swapInfo.imageArrayLayers       = 1;
+    swapInfo.imageArrayLayers       = std::min(m_preferredLayers,
+      std::max(caps.surfaceCapabilities.maxImageArrayLayers, 1u));
     swapInfo.imageUsage             = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
                                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     swapInfo.imageSharingMode       = VK_SHARING_MODE_EXCLUSIVE;
@@ -764,6 +775,7 @@ namespace dxvk {
       "\n  Color space:  ", swapInfo.imageColorSpace,
       "\n  Present mode: ", swapInfo.presentMode, " (dynamic: ", (dynamicModes.empty() ? "no)" : "yes)"),
       "\n  Buffer size:  ", swapInfo.imageExtent.width, "x", swapInfo.imageExtent.height,
+      "\n  Layers:       ", swapInfo.imageArrayLayers,
       "\n  Image count:  ", swapInfo.minImageCount));
     
     if ((status = m_vkd->vkCreateSwapchainKHR(m_vkd->device(), &swapInfo, nullptr, &m_swapchain))) {

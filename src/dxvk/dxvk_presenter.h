@@ -182,6 +182,15 @@ namespace dxvk {
     void setSurfaceExtent(VkExtent2D extent);
 
     /**
+     * \brief Sets preferred image layer count
+     *
+     * Stereo swap chains ask for two layers. If the Vulkan surface
+     * cannot provide that many, the swap chain is created with one.
+     * \param [in] layers Preferred number of image layers
+     */
+    void setImageLayers(uint32_t layers);
+
+    /**
      * \brief Sets HDR metadata
      *
      * Updated HDR metadata will be applied on the next \c acquire.
@@ -285,6 +294,7 @@ namespace dxvk {
     VkExtent2D                  m_preferredExtent = { };
     VkSurfaceFormatKHR          m_preferredFormat = { };
     uint32_t                    m_preferredSyncInterval = 1u;
+    uint32_t                    m_preferredLayers = 1u;
 
     bool                        m_dirtySwapchain = false;
     bool                        m_dirtySurface = false;
