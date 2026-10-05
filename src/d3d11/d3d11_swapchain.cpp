@@ -357,7 +357,7 @@ namespace dxvk {
   }
 
 
-  Rc<DxvkImageView> D3D11SwapChain::GetBackBufferView() {
+  Rc<DxvkImageView> D3D11SwapChain::GetBackBufferView(uint32_t Layer) {
     Rc<DxvkImage> image = GetCommonTexture(m_backBuffers[0].ptr())->GetImage();
 
     DxvkImageViewKey key;
@@ -367,7 +367,7 @@ namespace dxvk {
     key.aspects = VK_IMAGE_ASPECT_COLOR_BIT;
     key.mipIndex = 0u;
     key.mipCount = 1u;
-    key.layerIndex = 0u;
+    key.layerIndex = Layer;
     key.layerCount = 1u;
 
     return image->createView(key);
@@ -404,6 +404,12 @@ namespace dxvk {
 
     m_frameId += 1;
 
+    // Stereo swap chains present one layer per eye, but fall back to
+    // the left eye if the Vulkan swap chain only has a single layer.
+    uint32_t layerCount = m_desc.Stereo
+      ? std::min(backBuffer->info().numLayers, 2u)
+      : 1u;
+
     // Present from CS thread so that we don't
     // have to synchronize with it first.
     DxvkImageViewKey viewInfo = { };
@@ -413,14 +419,23 @@ namespace dxvk {
     viewInfo.aspects    = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.mipIndex   = 0u;
     viewInfo.mipCount   = 1u;
-    viewInfo.layerIndex = 0u;
     viewInfo.layerCount = 1u;
+
+    small_vector<Rc<DxvkImageView>, 2> backBufferViews;
+    small_vector<Rc<DxvkImageView>, 2> swapImageViews;
+
+    for (uint32_t i = 0u; i < layerCount; i++) {
+      viewInfo.layerIndex = i;
+
+      backBufferViews.push_back(backBuffer->createView(viewInfo));
+      swapImageViews.push_back(GetBackBufferView(i));
+    }
 
     immediateContext->EmitCs([
       cDevice         = m_device,
       cBlitter        = m_blitter,
-      cBackBuffer     = backBuffer->createView(viewInfo),
-      cSwapImage      = GetBackBufferView(),
+      cBackBuffers    = std::move(backBufferViews),
+      cSwapImages     = std::move(swapImageViews),
       cSync           = sync,
       cPresenter      = m_presenter,
       cLatency        = m_latency,
@@ -428,20 +443,23 @@ namespace dxvk {
       cFrameId        = m_frameId
     ] (DxvkContext* ctx) {
       // Update back buffer color space as necessary
-      if (cSwapImage->image()->info().colorSpace != cColorSpace) {
+      if (cSwapImages[0]->image()->info().colorSpace != cColorSpace) {
         DxvkImageUsageInfo usage = { };
         usage.colorSpace = cColorSpace;
 
-        ctx->ensureImageCompatibility(cSwapImage->image(), usage);
+        ctx->ensureImageCompatibility(cSwapImages[0]->image(), usage);
       }
 
-      // Blit the D3D back buffer onto the actual Vulkan
-      // swap chain and render the HUD if we have one.
+      // Blit the D3D back buffer onto the actual Vulkan swap chain
+      // and render the HUD if we have one. Stereo swap chains blit
+      // each eye onto its own layer.
       auto contextObjects = ctx->beginExternalRendering();
 
-      cBlitter->present(contextObjects,
-        cBackBuffer, VkRect2D(),
-        cSwapImage, VkRect2D());
+      for (size_t i = 0u; i < cBackBuffers.size(); i++) {
+        cBlitter->present(contextObjects,
+          cBackBuffers[i], VkRect2D(),
+          cSwapImages[i], VkRect2D());
+      }
 
       // Submit current command list and present
       ctx->synchronizeWsi(cSync);
@@ -517,6 +535,7 @@ namespace dxvk {
 
     m_presenter->setSurfaceFormat(GetSurfaceFormat(m_desc.Format));
     m_presenter->setSurfaceExtent({ m_desc.Width, m_desc.Height });
+    m_presenter->setImageLayers(m_desc.Stereo ? 2u : 1u);
     m_presenter->setFrameRateLimit(m_targetFrameRate, GetActualFrameLatency());
 
     m_latency = m_device->createLatencyTracker(m_presenter);
@@ -541,7 +560,7 @@ namespace dxvk {
     desc.Height             = std::max(m_desc.Height, 1u);
     desc.Depth              = 1;
     desc.MipLevels          = 1;
-    desc.ArraySize          = 1;
+    desc.ArraySize          = m_desc.Stereo ? 2u : 1u;
     desc.Format             = m_desc.Format;
     desc.SampleDesc         = m_desc.SampleDesc;
     desc.Usage              = D3D11_USAGE_DEFAULT;

@@ -127,7 +127,7 @@ namespace dxvk {
 
     Rc<hud::HudLatencyItem>   m_latencyHud;
 
-    Rc<DxvkImageView> GetBackBufferView();
+    Rc<DxvkImageView> GetBackBufferView(uint32_t Layer);
 
     HRESULT PresentImage(UINT SyncInterval);
 
