@@ -192,8 +192,31 @@ namespace dxvk {
   
   
   BOOL STDMETHODCALLTYPE DxgiFactory::IsWindowedStereoEnabled() {
-    // We don't support Stereo 3D at the moment
-    return FALSE;
+    // Windowed stereo is available if the Vulkan surface of a
+    // window can provide two image layers, which the compositor
+    // decides. Query a dummy window since we do not have a real one.
+    Rc<DxvkAdapter> adapter = m_instance->enumAdapters(0);
+
+    if (adapter == nullptr)
+      return FALSE;
+
+    Rc<vk::InstanceFn> vki = m_instance->vki();
+
+    Com<IDXGIVkSurfaceFactory> surfaceFactory = new DxgiSurfaceFactory(
+      vki->getLoaderProc(), nullptr);
+
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+
+    if (surfaceFactory->CreateSurface(vki->instance(), adapter->handle(), &surface))
+      return FALSE;
+
+    VkSurfaceCapabilitiesKHR caps = { };
+
+    VkResult vr = vki->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+      adapter->handle(), surface, &caps);
+
+    vki->vkDestroySurfaceKHR(vki->instance(), surface, nullptr);
+    return vr == VK_SUCCESS && caps.maxImageArrayLayers >= 2u;
   }
   
   
@@ -533,6 +556,18 @@ namespace dxvk {
       wsi::getWindowSize(hWnd,
         desc.Width  ? nullptr : &desc.Width,
         desc.Height ? nullptr : &desc.Height);
+    }
+
+    // Stereo swap chains must use the flip model, and need
+    // a surface that can provide two layers
+    if (desc.Stereo) {
+      bool flip = desc.SwapEffect == DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL
+               || desc.SwapEffect == DXGI_SWAP_EFFECT_FLIP_DISCARD;
+
+      if (!flip || !IsWindowedStereoEnabled()) {
+        Logger::err("DXGI: CreateSwapChainForHwnd: Stereo swap chain not supported");
+        return DXGI_ERROR_INVALID_CALL;
+      }
     }
 
     // If necessary, set up a default set of
