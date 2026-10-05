@@ -862,6 +862,13 @@ namespace dxvk {
         {  int32_t(m_dstRect.left),                    int32_t(m_dstRect.top)                    },
         { uint32_t(m_dstRect.right - m_dstRect.left), uint32_t(m_dstRect.bottom - m_dstRect.top) } };
 
+      // The surface may differ in size from the window, e.g. when
+      // it holds both eyes of a stereo image. Fill all of it.
+      if (!m_partialCopy) {
+        VkExtent3D imageExtent = backBuffer->info().extent;
+        dstRect.extent = { imageExtent.width, imageExtent.height };
+      }
+
       // Bump frame ID
       m_wctx->frameId += 1;
 
