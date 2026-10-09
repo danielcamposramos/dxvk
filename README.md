@@ -1,3 +1,27 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/sparky-stereo-os/sparkyos-swirl-light-128.png">
+  <img src=".github/sparky-stereo-os/sparkyos-swirl-dark-128.png" alt="SparkyOS" width="128" height="128">
+</picture>
+
+## Sparky Stereo OS
+
+This is the stereo version of DXVK by Sparky Stereo OS, forked from [doitsujin/dxvk](https://github.com/doitsujin/dxvk).
+It turns Direct3D 11.1 stereo swap chains (DXGI) into Vulkan swapchains with two image layers.
+
+Where it comes from:
+
+- [DXVK](https://github.com/doitsujin/dxvk) is made by Philip Rebohle, with Joshua Ashton, Robin Kertels, Jeffrey Ellison and other contributors.
+- [Debian](https://www.debian.org/) is the base of the system.
+- [SparkyLinux](https://sparkylinux.org/), by Paweł "pavroo" Pijanowski, builds on Debian.
+- [Sparky Stereo OS](https://github.com/Sparky-OS/sparky-stereo-os) is the stereo 3D edition of SparkyLinux: SparkyOS, powered by Debian.
+
+The `stereo3d` branch holds the version the distribution builds.
+The licence is unchanged; see [LICENSE](LICENSE).
+
+Sparky Stereo OS, Daniel Ramos's edition of SparkyLinux (by Paweł "pavroo" Pijanowski).
+
+---
+
 # DXVK
 
 A Vulkan-based translation layer for Direct3D 8/9/10/11 which allows running 3D applications on Linux using Wine.
